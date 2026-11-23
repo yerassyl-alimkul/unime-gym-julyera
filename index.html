@@ -524,6 +524,7 @@ function rCal(){
   $('#v-cal').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>openFree(b.dataset.f));
   $('#v-cal').querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>confirmBook(b.dataset.bk));
   $('#v-cal').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>pickDay(b.dataset.day));
+  $('#v-cal').querySelectorAll('[data-sched-edit]').forEach(b=>b.onclick=()=>editSched());
 }
 function bkRow(b){const d=pk(b.date),pl=plan[wdOf(d)];
   return `<button class="ex" data-d="${b.date}" onclick="openDay('${b.date}')"><div class="n">${d.getDate()}</div><div class="grow"><div class="nm">${WD[wdOf(d)]}, ${b.time} · ${b.gym}</div><div class="sub">${pl?pl.name+' · '+pl.items.length+' упр.':'план не задан'}</div></div>${IC.Rr.replace('<svg','<svg width="18" height="18"')}</button>`}
@@ -604,14 +605,15 @@ function occurrences(){if(!SCH||!SCH.rules.length)return [];const out=[],now=SRV
 function altsOf(o){const f=SCH.slots.filter(s=>s.date==o.date&&slotFree(s));
   f.sort((a,b)=>((a.sid==o.r.sid?0:1)-(b.sid==o.r.sid?0:1))||(Math.abs(mm(a.start)-mm(o.r.start))-Math.abs(mm(b.start)-mm(o.r.start))));return f.slice(0,4)}
 function schedHtml(){if(!LIVE||!SCH)return '';
-  if(!SCH.rules.length)return `<h3>Мой график</h3><div class="card muted small">График не задан. Задай его в боте командой /auto, и я буду записывать тебя сам. А пока выбери любой день в календаре и запишись на свободное время.</div>`;
+  const hd=`<div class="row"><h3 class="grow">Мой график</h3><button class="btn alt sm" data-sched-edit>${SCH.rules.length?'Изменить':'Составить'}</button></div>`;
+  if(!SCH.rules.length)return `${hd}<div class="card muted small">График не задан. Нажми «Составить», выбери зал, день и время, и я буду записывать тебя сам.</div>`;
   const rl=[...SCH.rules].sort((x,y)=>x.wd-y.wd||x.start.localeCompare(y.start)).map(r=>`${WD[r.wd]} ${r.start}`).join(' · ');
   const txt={booked:'Записан ✓',wait:'Место есть, запишу автоматически',queue:'Запишу после текущей тренировки',later:'Запись на этот день ещё не открыта',full:'На это время мест нет'};
   const rows=occurrences().map(o=>{const al=o.st=='full'?altsOf(o):[];
     return `<div class="lr sch ${o.st}"><div class="lr-main"><div class="lr-t">${fmtDFull(o.date)} · ${o.other?o.booked.time+' · '+o.booked.gym:o.r.start+' · '+(GN[o.r.sid]||'')}</div><div class="lr-s${o.st=='full'?' warn':''}">${o.other?'Записан на '+o.booked.time+' (в графике '+o.r.start+')':txt[o.st]}${o.st=='full'&&!al.length?'. Свободного времени в этот день нет':''}</div>
       ${o.st=='full'?`<div class="alts">${al.map(s=>`<button class="chip" data-bk="${slotRef(s)}">${s.start} · ${GN[s.sid]}</button>`).join('')}<button class="chip" data-day="${o.date}">Другой день</button></div>`:''}</div>
       ${o.st=='booked'||o.other?`<button class="lr-a on" data-d="${o.date}" aria-label="Открыть">${IC.ok}</button>`:''}</div>`}).join('');
-  return `<h3>Мой график</h3><div class="small muted" style="margin:-4px 0 10px">${rl}${SCH.auto_on?'':' · автозапись выключена'}</div>${rows?`<div class="list">${rows}</div>`:''}`}
+  return `${hd}<div class="small muted" style="margin:-4px 0 10px">${rl}${SCH.auto_on?'':' · автозапись выключена'}</div>${rows?`<div class="list">${rows}</div>`:''}`}
 function pickDay(from){sheet({html:()=>{const days=[];for(let i=1;i<=10;i++){const k=dkey(from,i),n=SCH.slots.filter(s=>s.date==k&&slotFree(s)).length;days.push([k,n])}
   return `<div class="sh-h"><div class="t">Другой день<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">Где есть свободное время</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
   <div class="list">${days.map(([k,n])=>`<button class="lr" data-f="${k}"><div class="lr-main"><div class="lr-t">${fmtDFull(k)}</div></div><div class="lr-v">${n?n+' слотов':'нет'}</div></button>`).join('')}</div>`},
@@ -621,6 +623,28 @@ function openFree(date){sheet({html:()=>{const sl=SCH.slots.filter(s=>s.date==da
   ${activeBk()?`<div class="card" style="margin-bottom:12px;font-size:13.5px">Сайт даёт одну активную запись: сейчас у тебя <b>${fmtDFull(activeBk().date)} · ${activeBk().time}</b>. Новую можно сделать после неё или перенести запись на другое время.</div>`:''}
   ${sl.length?gyms.map(g=>`<h3>${GN[g]||'UNIME'}</h3><div class="list">${sl.filter(s=>s.sid==g).map(s=>{const ok=slotFree(s);return `<div class="lr"><div class="lr-main"><div class="lr-t">${s.start}–${s.end}</div><div class="lr-s">${ok?`мест: ${s.free} из ${s.max}`:'мест нет'}</div></div>${ok?`<button class="btn sm" data-bk="${slotRef(s)}">${activeBk()?'Перенести':'Записаться'}</button>`:'<span class="muted small">занято</span>'}</div>`}).join('')}</div>`).join(''):`<div class="card muted">На этот день слотов пока нет. Запись открывается за несколько дней.</div>`}`},
   mount:el=>el.querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>confirmBook(b.dataset.bk))})}
+/* Редактор графика автозаписи */
+const WDL=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+let addSid=0,addWd=-1;
+async function schedCall(body,msg){try{applyServer(await api(body),true);rCal();if(tab!='cal')go(tab);if(msg)toast(msg);return true}catch(e){toast(e.code=='rules_limit'?'В графике уже 7 тренировок. Убери одну':'Не получилось, попробуй ещё раз');return false}}
+function editSched(){addSid=0;addWd=-1;sheet({html:()=>{const rs=[...SCH.rules].sort((x,y)=>x.wd-y.wd||x.start.localeCompare(y.start));
+  return `<div class="sh-h"><div class="t">Мой график<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">Как только заканчивается одна тренировка, запишу на следующую</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
+  ${rs.length?`<div class="list">${rs.map(r=>`<div class="lr"><div class="lr-main"><div class="lr-t">${WDL[r.wd]} · ${r.start}</div><div class="lr-s">${GN[r.sid]||'UNIME'}</div></div><button class="btn alt sm" data-rd="${r.sid}|${r.wd}|${r.start}" style="color:var(--danger)">Убрать</button></div>`).join('')}</div>`:'<div class="card muted small">Пока пусто. Добавь первую тренировку.</div>'}
+  ${rs.length<7?`<h3>Добавить тренировку</h3>
+  <div class="chips" style="flex-wrap:wrap">${[36,283].map(g=>`<button class="chip ${addSid==g?'on':''}" data-as="${g}">${GN[g]}</button>`).join('')}</div>
+  <div class="chips" style="flex-wrap:wrap">${[0,1,2,3,4,5,6].map(w=>`<button class="chip ${addWd==w?'on':''}" data-aw="${w}">${WDL[w]}</button>`).join('')}</div>
+  ${addSid&&addWd>=0?addTimes():'<div class="muted small">Выбери зал и день недели, потом время</div>'}`:'<div class="muted small" style="margin-top:12px">Максимум 7 тренировок в графике</div>'}
+  <button class="btn ${SCH.auto_on?'alt':'good'}" id="sc-auto" style="margin-top:16px;width:100%">${SCH.auto_on?'Выключить автозапись':'Включить автозапись'}</button>`},
+  mount:el=>{
+   el.querySelectorAll('[data-rd]').forEach(b=>b.onclick=async()=>{const q=b.dataset.rd.split('|'),sid=q[0],wd=q[1],st=q[2];b.disabled=true;if(await schedCall({action:'rule_del',sid:+sid,wd:+wd,start:st},'Убрал')){draw()}else b.disabled=false});
+   el.querySelectorAll('[data-as]').forEach(b=>b.onclick=()=>{addSid=+b.dataset.as;draw()});
+   el.querySelectorAll('[data-aw]').forEach(b=>b.onclick=()=>{addWd=+b.dataset.aw;draw()});
+   el.querySelectorAll('[data-at]').forEach(b=>b.onclick=async()=>{b.disabled=true;if(await schedCall({action:'rule_add',sid:addSid,wd:addWd,start:b.dataset.at},'Добавил в график')){addSid=0;addWd=-1;draw()}else b.disabled=false});
+   const a=el.querySelector('#sc-auto');a.onclick=async()=>{a.disabled=true;await schedCall({action:'auto',on:!SCH.auto_on},SCH.auto_on?'Автозапись включена':'Автозапись выключена');draw()}}})}
+function addTimes(){const seen=new Map();for(const s of SCH.slots){if(s.sid!=addSid)continue;if(wdOf(pk(s.date))!=addWd)continue;seen.set(s.start,s.end)}
+  const have=new Set(SCH.rules.filter(r=>r.sid==addSid&&r.wd==addWd).map(r=>r.start));
+  const ts=[...seen.entries()].filter(([st])=>!have.has(st)).sort((a,b)=>a[0].localeCompare(b[0]));
+  return ts.length?`<div class="chips" style="flex-wrap:wrap">${ts.map(([st,en])=>`<button class="chip" data-at="${st}">${st}–${en}</button>`).join('')}</div>`:'<div class="muted small">На этот день слотов в расписании нет</div>'}
 const ERR={has_active:'У тебя уже есть активная запись. Сначала отмени её или перенеси',login_required:'Нужно войти в бот зала: открой бота и отправь /start',full:'Места только что закончились',past:'Это время уже прошло',slot_not_found:'Слот уже недоступен',not_found:'Запись не найдена'};
 async function bookCall(action,s,btn,label,extra){
   try{applyServer(await api(Object.assign({action,lid:s.lid,sid:s.sid},extra||{})),true);closeAll();rCal();if(tab!='cal')go(tab);toast(action=='cancel'?'Запись отменена':action=='move'?'Перенёс ✓':'Записал ✓')}
