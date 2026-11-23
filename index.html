@@ -33,8 +33,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 #app{max-width:480px;margin:0 auto;padding:calc(var(--top) + 14px) 0 calc(120px + var(--bot));position:relative;min-height:100vh}
 .view{display:none;padding:0 var(--gutter)}.view.on{display:block;animation:fade .18s ease}
 @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.brand{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:600;font-size:17px;letter-spacing:-.01em;margin-bottom:18px}
-.brand svg{width:30px;height:30px;color:var(--ink)}
+.brand{display:flex;align-items:center;gap:10px;padding:0 var(--gutter);font-family:var(--font-display);font-weight:600;font-size:17px;letter-spacing:-.01em;margin-bottom:18px}
+.brand svg{width:34px;height:34px;flex:none;border-radius:10px}
 .brand small{margin-left:auto;font-family:var(--font-text);font-weight:500;font-size:11px;color:var(--ink-muted);border:1px solid var(--line);border-radius:99px;padding:3px 9px}
 h1{font-family:var(--font-display);font-weight:600;font-size:26px;line-height:1.15;letter-spacing:-.01em;margin:0 0 14px}
 h3{font-family:var(--font-display);font-weight:600;font-size:15px;margin:22px 0 10px}
@@ -58,8 +58,7 @@ h3{font-family:var(--font-display);font-weight:600;font-size:15px;margin:22px 0 
 .streak .fl{width:58px;height:58px;border-radius:20px;background:rgba(169,200,157,.14);display:flex;align-items:center;justify-content:center;flex:none}
 .streak .num{font-family:var(--font-display);font-weight:600;font-size:38px;line-height:1}
 .streak .lab{font-size:13px;color:#C9CAD2;margin-top:4px}
-.streak .rec{margin-left:auto;text-align:right;font-size:11.5px;color:#A6A8B1}
-.streak .rec b{display:block;font-family:var(--font-display);font-size:18px;color:#fff;font-weight:600}
+.streak{flex-wrap:wrap}.streak .quote{flex-basis:100%;font-size:14px;line-height:1.4;color:#D5D6DC;border-top:1px solid rgba(255,255,255,.1);padding-top:12px}
 /* calendar */
 .cal-h{display:flex;align-items:center;gap:8px;margin-bottom:10px}
 .cal-h .t{font-family:var(--font-display);font-weight:600;font-size:19px;flex:1}
@@ -168,6 +167,10 @@ svg .sf{fill:var(--scene);stroke:none;opacity:.55}
 .stp .ctl{display:flex;align-items:center;gap:10px}
 .stp .val{min-width:56px;text-align:center;font-family:var(--font-display);font-weight:600;font-size:18px}
 .day[data-f]{cursor:pointer}
+.th{width:56px;height:56px;border-radius:16px;background:var(--card2);flex:none;overflow:hidden}
+.th svg{width:100%;height:100%;display:block}
+.lr-thumb{display:flex;align-items:center;gap:12px;min-height:56px}
+.lr-tx{flex:1;min-width:0}
 </style>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -478,6 +481,13 @@ function applyServer(s,keepPlan){PROFILE=s.profile||{};SCH=s.schedule||null;SRV_
   const byRef={};BK_.forEach(b=>byRef[b.lid+':'+b.sid]=b);att={};
   (s.attendance||[]).forEach(x=>{const b=byRef[x.lid+':'+x.sid];if(b)att[b.date]=x.status=='was'});
   if(!keepPlan&&PROFILE.plan&&Object.keys(PROFILE.plan).length)plan=PROFILE.plan}
+const MOTTOS={
+ z:['Пустой зал не качается. Выбери ближайший слот.','Начать можно сегодня. «С понедельника» тоже сработает, но сегодня быстрее.','Первая тренировка серии самая простая. Сложнее всего дойти до двери.','Штанга никуда не убежит, она ждёт тебя.','Достаточно одной тренировки, чтобы серия пошла.'],
+ s:['Серия пошла. Не ломай её на ровном месте.','Привычка собирается по кирпичику, один уже лежит.','Хорошее начало. Главное — прийти в следующий раз.','Тело уже запомнило дорогу в зал.'],
+ l:['{n} подряд. Это уже режим, а не порыв.','Серия {n}: зал уже ждёт тебя по имени.','Железо терпеливое, ты тоже. {n} подряд.','{n} подряд. Скучная стабильность, из которой растут результаты.','Серия {n}. Цепочку лучше не рвать.']};
+function motto(n){const g=n==0?'z':n<3?'s':'l',L=MOTTOS[g];let i=Math.floor(Math.random()*L.length),k='mt_'+g;
+  try{const p=+localStorage.getItem(k);if(L.length>1&&i==p)i=(i+1)%L.length;localStorage.setItem(k,i)}catch(e){}
+  return L[i].replace('{n}',n)}
 function streaks(){let cur=0,best=0,run=0,done=false;
   const all=BK_.filter(b=>['att','miss'].includes(stOf(b)));
   for(const b of all){if(stOf(b)=='att'){run++;best=Math.max(best,run)}else run=0}
@@ -502,8 +512,8 @@ function rCal(){
     const canFree=LIVE&&SCH&&k>=TK&&!b;
     g+=`<button class="${cls}" ${b?`data-d="${k}"`:canFree?`data-f="${k}"`:'disabled style="opacity:.9"'}>${d}<span class="mk">${mk}</span></button>`}
   $('#v-cal').innerHTML=`
-  <div class="streak"><div class="fl">${IC.flame}</div><div><div class="num">${S.cur}</div><div class="lab">${S.cur?'тренировок подряд':'начни новую серию'}</div></div>
-   <div class="rec">рекорд<b>${S.best}</b></div></div>
+  <div class="streak"><div class="fl">${IC.flame}</div><div><div class="num">${S.cur}</div><div class="lab">${S.cur?'тренировок подряд':'серия не начата'}</div></div>
+   <div class="quote">${motto(S.cur)}</div></div>
   <div class="cal-h"><div class="t">${MN[m]} ${y}</div><button class="ib" id="pm">${IC.L}</button><button class="ib" id="nm">${IC.Rr}</button></div>
   <div class="wk">${WD.map(w=>`<span>${w}</span>`).join('')}</div><div class="grid">${g}</div>
   <div class="legend"><span><i style="background:var(--accent)"></i>был</span><span><i style="border:2px solid var(--accent)"></i>запись</span><span><i style="background:var(--yellow)"></i>отметь</span><span><i style="background:rgba(179,38,30,.35)"></i>пропуск</span></div>
@@ -545,7 +555,11 @@ function mark(k,v){att[k]=v;saveAtt();if(LIVE){const b=bkOf[k];api({action:'mark
 window.mark=mark;window.openDay=openDay;window.closeAll=closeAll;window.back=back;
 const levelDay=(pl,m)=>{let L=0;for(const it of pl.items){const e=EM[it.id];L=Math.max(L,level(e,m))}return L};
 function exRow(it,i){const e=EM[it.id];return `<button class="lr" data-ex="${e.id}"><div class="lr-main"><div class="lr-t">${e.n}</div><div class="lr-s">${e.p.map(m=>M[m]).join(', ')} · ${e.eq}</div></div><div class="lr-v">${it.s} × ${it.r}${e.u?' '+e.u:''}${it.w?`<small>${it.w} кг</small>`:''}</div></button>`}
-function thumb(e){const p=mix(e.A,e.B,.6);return `<svg viewBox="40 0 220 200" width="54" height="54">${figure(e,p)}</svg>`}
+function thumb(e){return `<div class="th" data-th="${e.id}"><svg viewBox="40 0 220 200">${figure(e,mix(e.A,e.B,.6))}</svg></div>`}
+let thTimer=0;const RM=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+function thumbsTick(){thTimer=setTimeout(thumbsTick,90);const els=document.querySelectorAll('#v-lib [data-th]');if(!els.length||tab!='lib'||stack.length||document.hidden)return;
+  const t=performance.now(),H=innerHeight;els.forEach((el,i)=>{const r=el.getBoundingClientRect();if(r.bottom<0||r.top>H)return;const e=EM[el.dataset.th],k=.5-.5*Math.cos((t/2800+i*.13)*2*Math.PI);el.firstChild.innerHTML=figure(e,mix(e.A,e.B,k))})}
+function startThumbs(){if(RM||thTimer)return;thTimer=setTimeout(thumbsTick,90)}
 
 /* ===== Упражнение: анимация ===== */
 function openEx(id,opt={}){const e=EM[id],hasBack=stack.length>0;
@@ -618,25 +632,26 @@ function confirmCancel(b){sheet({html:()=>`<div class="sh-h"><div class="t">От
 window.confirmBook=confirmBook;
 
 /* ===== Библиотека ===== */
-let q='',eqf='Все',mf='';
-const hasEx=id=>((plan[selWd]||{items:[]}).items).some(i=>i.id==id);
-function rLib(){const eqs=['Все','Штанга','Гантели','Тренажёр','Блок','Свой вес'];
-  const list=E.filter(e=>(eqf=='Все'||e.eq==eqf)&&(!mf||e.p.includes(mf)||e.s.includes(mf))&&e.n.toLowerCase().includes(q.toLowerCase()));
+let q='',mf='';
+const dayHas=(w,id)=>((plan[w]||{items:[]}).items).some(i=>i.id==id);
+const inPlan=id=>WD.some((_,w)=>dayHas(w,id));
+function rLib(){
+  const list=E.filter(e=>(!mf||e.p.includes(mf)||e.s.includes(mf))&&e.n.toLowerCase().includes(q.toLowerCase()));
   $('#v-lib').innerHTML=`<h1>Упражнения</h1>
   <input class="search" id="q" placeholder="Поиск: жим, присед…" value="${q}">
-  <div class="small muted" style="margin:2px 0 6px">Добавлять в день</div>
-  <div class="chips">${WD.map((w,i)=>`<button class="chip ${selWd==i?'on':''}" data-wd="${i}">${w}</button>`).join('')}</div>
-  <div class="chips">${eqs.map(e=>`<button class="chip ${eqf==e?'on':''}" data-eq="${e}">${e}</button>`).join('')}</div>
-  <div class="chips">${Object.entries(M).map(([k,v])=>`<button class="chip ${mf==k?'on':''}" data-m="${k}">${v}</button>`).join('')}</div>
-  <div class="small muted" style="margin:2px 0 10px">${list.length} из ${E.length} · тап по названию — анимация и разбор</div>
-  ${list.length?`<div class="list">${list.map(e=>{const on=hasEx(e.id);return `<div class="lr"><button class="lr-main" data-ex="${e.id}"><div class="lr-t">${e.n}</div><div class="lr-s">${e.p.map(m=>M[m]).join(', ')} · ${e.eq}</div></button><button class="lr-a ${on?'on':''}" data-add="${e.id}" aria-label="В план">${on?IC.ok:'+'}</button></div>`}).join('')}</div>`:'<div class="card muted">Ничего не найдено</div>'}`;
+  <div class="chips"><button class="chip ${mf?'':'on'}" data-m="">Все</button>${Object.entries(M).map(([k,v])=>`<button class="chip ${mf==k?'on':''}" data-m="${k}">${v}</button>`).join('')}</div>
+  ${list.length?`<div class="list">${list.map(e=>{const on=inPlan(e.id);return `<div class="lr"><button class="lr-main lr-thumb" data-ex="${e.id}">${thumb(e)}<div class="lr-tx"><div class="lr-t">${e.n}</div><div class="lr-s">${e.p.map(m=>M[m]).join(', ')} · ${e.eq}</div></div></button><button class="lr-a ${on?'on':''}" data-add="${e.id}" aria-label="В план">${on?IC.ok:'+'}</button></div>`}).join('')}</div>`:'<div class="card muted">Ничего не найдено</div>'}`;
   const el=$('#v-lib');el.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>openEx(b.dataset.ex));
-  el.querySelectorAll('[data-eq]').forEach(b=>b.onclick=()=>{eqf=b.dataset.eq;rLib()});
-  el.querySelectorAll('[data-wd]').forEach(b=>b.onclick=()=>{selWd=+b.dataset.wd;rLib()});
-  el.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{mf=mf==b.dataset.m?'':b.dataset.m;rLib()});
-  el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const id=b.dataset.add,dd=plan[selWd]||(plan[selWd]={name:'',items:[]}),ix=dd.items.findIndex(i=>i.id==id);
-    if(ix>=0){dd.items.splice(ix,1);if(!dd.items.length)dd.name=''}else{dd.items.push({id,s:3,r:EM[id].r0||10});if(!dd.name)dd.name=WD[selWd]}savePlan();rLib()});
-  const i=$('#q');i.oninput=()=>{q=i.value;const p=i.selectionStart;rLib();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}
+  el.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{mf=b.dataset.m==mf?'':b.dataset.m;rLib()});
+  el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>addToDay(b.dataset.add));
+  const i=$('#q');i.oninput=()=>{q=i.value;const p=i.selectionStart;rLib();const n=$('#q');n.focus();n.setSelectionRange(p,p)};
+  startThumbs()}
+function addToDay(id){const e=EM[id];sheet({html:()=>`<div class="sh-h"><div class="t">${e.n}<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">В какие дни добавить</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
+  <div class="chips" style="flex-wrap:wrap;overflow:visible;margin:0;padding:0">${WD.map((w,i)=>`<button class="chip ${dayHas(i,id)?'on':''}" data-w="${i}" style="min-height:44px;min-width:56px;justify-content:center">${w}</button>`).join('')}</div>
+  <button class="btn" style="margin-top:16px" onclick="closeAll()">Готово</button>`,
+  mount:el=>el.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{const w=+b.dataset.w,dd=plan[w]||(plan[w]={name:'',items:[]}),ix=dd.items.findIndex(i=>i.id==id);
+    if(ix>=0){dd.items.splice(ix,1);if(!dd.items.length)dd.name=''}else{dd.items.push({id,s:3,r:EM[id].r0||10});if(!dd.name)dd.name=WD[w]}
+    b.classList.toggle('on',ix<0);savePlan();rLib()})})}
 
 /* ===== Конструктор плана ===== */
 function rPlan(){const d=plan[selWd]||{name:'',items:[]},wdn=['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
