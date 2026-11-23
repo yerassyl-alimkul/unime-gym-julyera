@@ -142,11 +142,16 @@ ol.st li:before{content:counter(s);width:24px;height:24px;border-radius:8px;back
 .ach div.off{opacity:.4}.ach b{display:block;font-size:22px;margin-bottom:2px}
 svg .sc{stroke:var(--scene);fill:none;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
 svg .sf{fill:var(--scene);stroke:none;opacity:.55}
+.onb{position:fixed;inset:0;z-index:60;background:var(--bg);overflow:auto;padding:36px var(--gutter) 40px;max-width:520px;margin:0 auto}
+.onb h1{font-family:var(--font-display);font-size:26px;margin:0 0 8px}
+.onb .oc{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 22px}
+.onb .chip{min-height:44px;padding:9px 16px;font-size:15px}
 </style>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
 <div id="app">
-  <div class="brand"><svg id="logo" viewBox="0 0 64 64" fill="none"></svg><span>UniMe Gym</span><small>прототип</small></div>
+  <div class="brand"><svg id="logo" viewBox="0 0 64 64" fill="none"></svg><span>UniMe Gym</span><small id="mode">демо</small></div>
   <section class="view" id="v-cal"></section>
   <section class="view" id="v-lib"></section>
   <section class="view" id="v-plan"></section>
@@ -420,14 +425,21 @@ document.getElementById('logo').innerHTML='<path d="M10 32h6M48 32h6M16 22v20M48
 document.getElementById('dock').innerHTML=[['cal','Календарь'],['lib','Упражнения'],['plan','План'],['me','Профиль']].map(([k,t])=>`<button data-t="${k}">${IC[k]}<span>${t}</span></button>`).join('');
 
 /* ===== Состояние ===== */
-let plan=rd('ug_plan',null);
+/* ===== Сервер (Mini App в Telegram) ===== */
+const TGW=window.Telegram&&window.Telegram.WebApp,INIT=(TGW&&TGW.initData)||'',LIVE=!!INIT;
+const API='https://ntgomhodhsjcccjscgci.supabase.co/functions/v1/app';
+async function api(body){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':INIT},body:JSON.stringify(body)});if(!r.ok)throw new Error(r.status);return r.json()}
+let PROFILE=null;
+let plan=LIVE?null:rd('ug_plan',null);
 if(!plan){const mk=(id,n,ids)=>({name:n,items:ids.map(i=>({id:i,s:3,r:EM[i].r0||10}))});
-  plan={0:mk('push','Push',COMBOS[0].ex.slice(0,5)),2:mk('pull','Pull',COMBOS[1].ex.slice(0,5)),4:mk('legs','Legs',COMBOS[2].ex.slice(0,5))};wr('ug_plan',plan)}
-let att=rd('ug_att',{});
-const savePlan=()=>wr('ug_plan',plan),saveAtt=()=>wr('ug_att',att);
+  plan={0:mk('push','Push',COMBOS[0].ex.slice(0,5)),2:mk('pull','Pull',COMBOS[1].ex.slice(0,5)),4:mk('legs','Legs',COMBOS[2].ex.slice(0,5))};if(!LIVE)wr('ug_plan',plan)}
+let att=LIVE?{}:rd('ug_att',{});
+let _pt=null;
+const savePlan=()=>{if(!LIVE)return wr('ug_plan',plan);clearTimeout(_pt);_pt=setTimeout(()=>api({action:'profile',plan}).catch(()=>toast('Не удалось сохранить план')),600)};
+const saveAtt=()=>{if(!LIVE)wr('ug_att',att)};
 /* демо-записи: Пн/Ср/Пт в течение 7 недель назад и 2 недели вперёд */
-const BK_=[];
-(()=>{const s=new Date(TODAY);s.setDate(s.getDate()-49);
+let BK_=[];
+(()=>{if(LIVE)return;const s=new Date(TODAY);s.setDate(s.getDate()-49);
   for(let i=0;i<64;i++){const d=new Date(s);d.setDate(s.getDate()+i);const w=wdOf(d);
     if(w==0||w==2||w==4)BK_.push({date:key(d),time:w==2?'19:00':'18:00',gym:w==2?'Cittadella':'Mariani'})}})();
 const past=BK_.filter(b=>b.date<TK).reverse(); // новые → старые
@@ -435,7 +447,14 @@ const seed={};past.forEach((b,i)=>{if(i==0)return;seed[b.date]=!(i==7||i==13)});
 const stOf=b=>{if(att[b.date]!==undefined)return att[b.date]?'att':'miss';
   if(b.date>TK)return 'up';if(b.date==TK)return 'today';
   return seed[b.date]===undefined?'pend':seed[b.date]?'att':'miss'};
-const bkOf=Object.fromEntries(BK_.map(b=>[b.date,b]));
+let bkOf=Object.fromEntries(BK_.map(b=>[b.date,b]));
+const GYM={36:'Mariani',283:'Cittadella'};
+function applyServer(s){PROFILE=s.profile||{};
+  BK_=(s.bookings||[]).map(x=>{const t=String(x.start_local).replace(' ','T');return {date:t.slice(0,10),time:t.slice(11,16),gym:GYM[x.sid]||'UNIME',lid:x.lid,sid:x.sid}});
+  bkOf=Object.fromEntries(BK_.map(b=>[b.date,b]));
+  const byRef={};BK_.forEach(b=>byRef[b.lid+':'+b.sid]=b);att={};
+  (s.attendance||[]).forEach(x=>{const b=byRef[x.lid+':'+x.sid];if(b)att[b.date]=x.status=='was'});
+  if(PROFILE.plan&&Object.keys(PROFILE.plan).length)plan=PROFILE.plan}
 function streaks(){let cur=0,best=0,run=0,done=false;
   const all=BK_.filter(b=>['att','miss'].includes(stOf(b)));
   for(const b of all){if(stOf(b)=='att'){run++;best=Math.max(best,run)}else run=0}
@@ -491,7 +510,7 @@ function openDay(k){const b=bkOf[k],d=pk(k),pl=plan[wdOf(d)],s=stOf(b);
   ${pl&&pl.items.length?pl.items.map((it,i)=>exRow(it,i)).join(''):`<div class="card muted">На этот день нет упражнений.</div><button class="btn" style="margin-top:10px" onclick="selWd=${wdOf(d)};closeAll();go('plan')">Собрать план</button>`}
   ${pl&&pl.items.length?mapPair(m=>levelDay(pl,m)):''}`,
    mount:el=>el.querySelectorAll('[data-ex]').forEach(r=>r.onclick=()=>openEx(r.dataset.ex))})}
-function mark(k,v){att[k]=v;saveAtt();stack.pop();toast(v?'Серия растёт 🔥':'Серия сброшена');draw();rCal();openDay(k)}
+function mark(k,v){att[k]=v;saveAtt();if(LIVE){const b=bkOf[k];api({action:'mark',lid:b.lid,sid:b.sid,status:v?'was':'missed'}).catch(()=>toast('Не удалось сохранить отметку'))}stack.pop();toast(v?'Серия растёт 🔥':'Серия сброшена');draw();rCal();openDay(k)}
 window.mark=mark;window.openDay=openDay;window.closeAll=closeAll;
 const levelDay=(pl,m)=>{let L=0;for(const it of pl.items){const e=EM[it.id];L=Math.max(L,level(e,m))}return L};
 function exRow(it,i){const e=EM[it.id];return `<button class="ex" data-ex="${e.id}"><div class="mini">${thumb(e)}</div><div class="grow"><div class="nm">${e.n}</div><div class="sub"><span class="tag">${e.eq}</span>${it.s} × ${it.r}${e.u?' '+e.u:''}</div></div>${IC.Rr.replace('<svg','<svg width="18" height="18"')}</button>`}
@@ -574,11 +593,33 @@ function pick(){sheet({html:()=>`<div class="sh-h"><div class="t">Добавит
 const _close=closeAll;
 
 /* ===== Профиль ===== */
+const GOALS={mass:['Набор массы','💪',4,10],strength:['Сила','🏋️',5,5],cut:['Похудение','🔥',3,15],shape:['Форма','✨',3,12]};
+const SCHED={1:{0:5},2:{0:5,3:5},3:{0:0,2:1,4:2},4:{0:3,1:4,3:3,4:4},5:{0:0,1:1,2:2,3:3,4:4},6:{0:0,1:1,2:2,3:0,4:1,5:2}};
+function starterPlan(n,g){const [,,s,r]=GOALS[g]||GOALS.shape,o={};
+  for(const [w,ci] of Object.entries(SCHED[Math.min(Math.max(n,1),6)])){const c=COMBOS[ci];o[w]={name:c.n,items:c.ex.slice(0,5).map(id=>({id,s,r}))}}return o}
+function profCard(){const g=GOALS[PROFILE.goal];return `<div class="card" style="margin-bottom:12px"><div class="row"><div class="grow"><b>${g?g[1]+' '+g[0]:'Цель не выбрана'}</b><div class="small muted">${PROFILE.days_per_week?PROFILE.days_per_week+' тренировок в неделю':''}</div></div><button class="btn alt sm" onclick="onboard(true)">Изменить</button></div></div>`}
+function onboard(keep){let goal=PROFILE&&PROFILE.goal&&GOALS[PROFILE.goal]?PROFILE.goal:'',days=(PROFILE&&PROFILE.days_per_week)||3;
+  const el=document.createElement('div');el.className='onb';document.body.appendChild(el);
+  const paint=()=>{el.innerHTML=`<h1></h1><div class="muted">Ответь на два вопроса, и я соберу стартовый план.</div>
+   <h3>Какая цель?</h3><div class="oc">${Object.entries(GOALS).map(([k,v])=>`<button class="chip${goal==k?' on':''}" data-g="${k}">${v[1]} ${v[0]}</button>`).join('')}</div>
+   <h3>Сколько раз в неделю?</h3><div class="oc">${[2,3,4,5,6].map(n=>`<button class="chip${days==n?' on':''}" data-d="${n}">${n}</button>`).join('')}</div>
+   <button class="btn" id="onb-go" ${goal?'':'disabled style="opacity:.5"'}>${keep===true?'Сохранить':'Начать'}</button>`;
+   const nm=(PROFILE&&PROFILE.first_name)||(TGW&&TGW.initDataUnsafe&&TGW.initDataUnsafe.user&&TGW.initDataUnsafe.user.first_name)||'';
+   el.querySelector('h1').textContent=keep===true?'Твоя цель':(nm?'Привет, '+nm+'!':'Привет!');
+   el.querySelectorAll('[data-g]').forEach(b=>b.onclick=()=>{goal=b.dataset.g;paint()});
+   el.querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>{days=+b.dataset.d;paint()});
+   el.querySelector('#onb-go').onclick=async()=>{if(!goal)return;const body={action:'profile',goal,days_per_week:days,onboarded:true};
+     if(keep!==true){plan=starterPlan(days,goal);body.plan=plan}
+     try{applyServer(await api(body))}catch(e){toast('Не удалось сохранить, попробуй ещё раз');return}
+     el.remove();go(keep===true?'me':'cal')}};
+  paint()}
+window.onboard=onboard;
 function rMe(){const S=streaks(),mo=BK_.filter(b=>b.date.slice(0,7)==TK.slice(0,7)&&stOf(b)=='att').length;
   const load={};let tot=0;for(const p of Object.values(plan))for(const it of p.items){const e=EM[it.id];for(const m of e.p){load[m]=(load[m]||0)+it.s;tot+=it.s}for(const m of e.s){load[m]=(load[m]||0)+it.s*.5}}
   const mx=Math.max(1,...Object.values(load)),pl=Object.values(plan).filter(p=>p.items.length).length;
   const A=[['🔥','3 подряд',S.best>=3],['⚡','7 подряд',S.best>=7],['🏆','14 подряд',S.best>=14],['👟','Первая',S.total>=1],['💪','10 тренировок',S.total>=10],['📋','План собран',pl>=3]];
   $('#v-me').innerHTML=`<h1>Профиль</h1>
+  ${LIVE&&PROFILE?profCard():''}
   <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px">
    ${[[S.cur,'серия'],[S.total,'всего'],[mo,'в этом месяце']].map(([n,l])=>`<div class="card" style="text-align:center;padding:14px 6px"><div style="font-family:var(--font-display);font-weight:600;font-size:26px">${n}</div><div class="small muted">${l}</div></div>`).join('')}</div>
   <h3>Нагрузка по плану за неделю</h3><div class="card">${Object.keys(M).map(m=>`<div class="row" style="margin:6px 0"><span class="small" style="width:118px">${M[m]}</span><div class="bar grow"><i style="width:${(load[m]||0)/mx*100}%"></i></div><span class="small muted" style="width:26px;text-align:right">${Math.round(load[m]||0)}</span></div>`).join('')}<div class="small muted" style="margin-top:8px">число подходов (вспомогательные мышцы — с коэффициентом ½)</div></div>
@@ -589,5 +630,10 @@ function rMe(){const S=streaks(),mo=BK_.filter(b=>b.date.slice(0,7)==TK.slice(0,
 /* Telegram: если открыто как Mini App */
 try{const tg=window.Telegram&&window.Telegram.WebApp;if(tg){tg.ready();tg.expand();document.documentElement.dataset.theme=tg.colorScheme||'light'}}catch(e){}
 
-go('cal');
+async function boot(){
+  if(LIVE){const m=$('#mode');if(m)m.remove();
+    try{applyServer(await api({action:'me'}))}catch(e){$('#v-cal').classList.add('on');$('#v-cal').innerHTML='<div class="card" style="margin:20px">Не удалось загрузить данные. Закрой приложение и открой его снова из бота.</div>';return}
+    if(!PROFILE.onboarded){onboard();return}}
+  go('cal')}
+boot();
 </script></body></html>
