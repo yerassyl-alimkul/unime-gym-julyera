@@ -146,6 +146,28 @@ svg .sf{fill:var(--scene);stroke:none;opacity:.55}
 .onb h1{font-family:var(--font-display);font-size:26px;margin:0 0 8px}
 .onb .oc{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 22px}
 .onb .chip{min-height:44px;padding:9px 16px;font-size:15px}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-card);padding:2px 14px;margin-bottom:6px}
+.lr{display:flex;align-items:center;gap:12px;width:100%;min-height:58px;padding:11px 0;border:0;border-bottom:1px solid var(--hairline);background:none;color:inherit;text-align:left;font:inherit}
+.list>.lr:last-child{border-bottom:0}
+.lr .n{flex:none;width:22px;color:var(--ink-muted);font-variant-numeric:tabular-nums;font-size:14px}
+.lr-main{flex:1;min-width:0;background:none;border:0;padding:0;color:inherit;text-align:left;font:inherit}
+.lr-t{font-weight:600;font-size:15.5px;line-height:1.25}
+.lr-s{color:var(--ink-muted);font-size:13px;margin-top:3px;line-height:1.35}
+.lr-s.warn{color:var(--danger)}
+.lr-v{flex:none;text-align:right;font-weight:600;font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.lr-v small{display:block;margin-top:2px;color:var(--ink-muted);font-weight:500;font-size:12px}
+.lr-a{flex:none;width:44px;height:44px;border-radius:14px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center}
+.lr-a svg{width:18px;height:18px}
+.lr-a.on{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme=dark] .lr-a.on{color:#111214}
+.alts{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.alts .chip{min-height:40px;padding:8px 14px;font-size:14px}
+.stp{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:60px;border-bottom:1px solid var(--hairline)}
+.stp:last-child{border-bottom:0}
+.stp>span{font-weight:500}
+.stp .ctl{display:flex;align-items:center;gap:10px}
+.stp .val{min-width:56px;text-align:center;font-family:var(--font-display);font-weight:600;font-size:18px}
+.day[data-f]{cursor:pointer}
 </style>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
@@ -421,14 +443,14 @@ const IC={
  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
  flame:'<svg viewBox="0 0 24 24" fill="none" stroke="#A9C89D" stroke-width="2.200" stroke-linecap="round" stroke-linejoin="round" width="32" height="32"><path d="M12 3c1 3.500 5 5.500 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3-1-6 1-9z"/></svg>'
 };
-document.getElementById('logo').innerHTML='<path d="M10 32h6M48 32h6M16 22v20M48 22v20M22 18v28M42 18v28M22 32h20" stroke="currentColor" stroke-width="5.500" stroke-linecap="round" stroke-linejoin="round"/>';
+document.getElementById('logo').innerHTML='<rect width="64" height="64" rx="16" fill="#557546"/><g transform="translate(32 33) scale(0.76) translate(-32 -24)" fill="none" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9 V27 Q4 40 16 40 Q28 40 28 27 V9" stroke="#E2D47E"/><g transform="translate(52 24) rotate(-45) scale(1.05)" stroke="#FFFFFF"><path d="M-9 0 H9 M-9 -8 V8 M9 -8 V8"/></g></g>';
 document.getElementById('dock').innerHTML=[['cal','Календарь'],['lib','Упражнения'],['plan','План'],['me','Профиль']].map(([k,t])=>`<button data-t="${k}">${IC[k]}<span>${t}</span></button>`).join('');
 
 /* ===== Состояние ===== */
 /* ===== Сервер (Mini App в Telegram) ===== */
 const TGW=window.Telegram&&window.Telegram.WebApp,INIT=(TGW&&TGW.initData)||'',LIVE=!!INIT;
 const API='https://ntgomhodhsjcccjscgci.supabase.co/functions/v1/app';
-async function api(body){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':INIT},body:JSON.stringify(body)});if(!r.ok)throw new Error(r.status);return r.json()}
+async function api(body){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':INIT},body:JSON.stringify(body)});if(!r.ok){let c='',m='';try{const j=await r.json();c=j.error||'';m=j.message||''}catch(e){}const er=new Error(r.status);er.code=c;er.msg=m;throw er}return r.json()}
 let PROFILE=null;
 let plan=LIVE?null:rd('ug_plan',null);
 if(!plan){const mk=(id,n,ids)=>({name:n,items:ids.map(i=>({id:i,s:3,r:EM[i].r0||10}))});
@@ -449,12 +471,13 @@ const stOf=b=>{if(att[b.date]!==undefined)return att[b.date]?'att':'miss';
   return seed[b.date]===undefined?'pend':seed[b.date]?'att':'miss'};
 let bkOf=Object.fromEntries(BK_.map(b=>[b.date,b]));
 const GYM={36:'Mariani',283:'Cittadella'};
-function applyServer(s){PROFILE=s.profile||{};
+let SCH=null,SRV_NOW='';
+function applyServer(s,keepPlan){PROFILE=s.profile||{};SCH=s.schedule||null;SRV_NOW=s.now||SRV_NOW;
   BK_=(s.bookings||[]).map(x=>{const t=String(x.start_local).replace(' ','T');return {date:t.slice(0,10),time:t.slice(11,16),gym:GYM[x.sid]||'UNIME',lid:x.lid,sid:x.sid}});
   bkOf=Object.fromEntries(BK_.map(b=>[b.date,b]));
   const byRef={};BK_.forEach(b=>byRef[b.lid+':'+b.sid]=b);att={};
   (s.attendance||[]).forEach(x=>{const b=byRef[x.lid+':'+x.sid];if(b)att[b.date]=x.status=='was'});
-  if(PROFILE.plan&&Object.keys(PROFILE.plan).length)plan=PROFILE.plan}
+  if(!keepPlan&&PROFILE.plan&&Object.keys(PROFILE.plan).length)plan=PROFILE.plan}
 function streaks(){let cur=0,best=0,run=0,done=false;
   const all=BK_.filter(b=>['att','miss'].includes(stOf(b)));
   for(const b of all){if(stOf(b)=='att'){run++;best=Math.max(best,run)}else run=0}
@@ -476,16 +499,20 @@ function rCal(){
   for(let d=1;d<=dim;d++){const dt=new Date(y,m,d),k=key(dt),b=bkOf[k],s=b?stOf(b):'';
     const cls=['day',k==TK?'today':'',s=='att'?'done':s=='pend'?'pend':s=='miss'?'miss':(s=='up'||s=='today')?'up':''].join(' ');
     const mk=s=='att'?IC.ok:s=='miss'?IC.x:s=='pend'?'?':b?'<span class="dot" style="background:var(--accent)"></span>':'';
-    g+=`<button class="${cls}" ${b?`data-d="${k}"`:'disabled style="opacity:.9"'}>${d}<span class="mk">${mk}</span></button>`}
+    const canFree=LIVE&&SCH&&k>=TK&&!b;
+    g+=`<button class="${cls}" ${b?`data-d="${k}"`:canFree?`data-f="${k}"`:'disabled style="opacity:.9"'}>${d}<span class="mk">${mk}</span></button>`}
   $('#v-cal').innerHTML=`
   <div class="streak"><div class="fl">${IC.flame}</div><div><div class="num">${S.cur}</div><div class="lab">${S.cur?'тренировок подряд':'начни новую серию'}</div></div>
    <div class="rec">рекорд<b>${S.best}</b></div></div>
   <div class="cal-h"><div class="t">${MN[m]} ${y}</div><button class="ib" id="pm">${IC.L}</button><button class="ib" id="nm">${IC.Rr}</button></div>
   <div class="wk">${WD.map(w=>`<span>${w}</span>`).join('')}</div><div class="grid">${g}</div>
   <div class="legend"><span><i style="background:var(--accent)"></i>был</span><span><i style="border:2px solid var(--accent)"></i>запись</span><span><i style="background:var(--yellow)"></i>отметь</span><span><i style="background:rgba(179,38,30,.35)"></i>пропуск</span></div>
-  <h3>Ближайшие</h3>${BK_.filter(b=>b.date>=TK).slice(0,3).map(b=>bkRow(b)).join('')}`;
+  ${schedHtml()}<h3>Ближайшие</h3>${BK_.filter(b=>b.date>=TK).slice(0,3).map(b=>bkRow(b)).join('')}`;
   $('#pm').onclick=()=>{vm=new Date(y,m-1,1);rCal()};$('#nm').onclick=()=>{vm=new Date(y,m+1,1);rCal()};
   $('#v-cal').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>openDay(b.dataset.d));
+  $('#v-cal').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>openFree(b.dataset.f));
+  $('#v-cal').querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>confirmBook(b.dataset.bk));
+  $('#v-cal').querySelectorAll('[data-day]').forEach(b=>b.onclick=()=>pickDay(b.dataset.day));
 }
 function bkRow(b){const d=pk(b.date),pl=plan[wdOf(d)];
   return `<button class="ex" data-d="${b.date}" onclick="openDay('${b.date}')"><div class="n">${d.getDate()}</div><div class="grow"><div class="nm">${WD[wdOf(d)]}, ${b.time} · ${b.gym}</div><div class="sub">${pl?pl.name+' · '+pl.items.length+' упр.':'план не задан'}</div></div>${IC.Rr.replace('<svg','<svg width="18" height="18"')}</button>`}
@@ -500,20 +527,24 @@ function draw(){const fn=stack[stack.length-1];stopAnim();const L=$('#layer');
 const closeAll=()=>{stack=[];draw();go(tab)},back=()=>{stack.pop();draw()};
 function stopAnim(){if(anim){cancelAnimationFrame(anim.id);anim=null}}
 
+const MG=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const fmtDFull=k=>{const d=pk(k);return `${WD[wdOf(d)]}, ${d.getDate()} ${MG[d.getMonth()]}`};
 function openDay(k){const b=bkOf[k],d=pk(k),pl=plan[wdOf(d)],s=stOf(b);
+  const canCancel=LIVE&&SCH&&(k+' '+b.time)>SRV_NOW.slice(0,16);
   sheet({html:()=>`
-  <div class="sh-h"><div class="t">${WD[wdOf(d)]}, ${d.getDate()} ${MN[d.getMonth()].toLowerCase()}<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">${b.time} · ${b.gym}${s=='att'?' · был ✓':s=='miss'?' · пропуск':''}</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
-  ${(s=='pend'||s=='today'||s=='up'&&false)?'':''}
+  <div class="sh-h"><div class="t">${fmtDFull(k)}<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">${b.time} · ${b.gym}${s=='att'?' · был ✓':s=='miss'?' · пропуск':''}</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
   ${s=='pend'||s=='today'?`<div class="card" style="margin-bottom:12px"><div class="small muted" style="margin-bottom:8px">${s=='pend'?'Тренировка прошла. Ты был?':'Отметь после тренировки:'}</div><div class="row"><button class="btn good sm grow" onclick="mark('${k}',true)">Был ✓</button><button class="btn alt sm grow" onclick="mark('${k}',false)">Не был</button></div></div>`:''}
   ${s=='att'||s=='miss'?`<button class="btn alt sm" style="margin-bottom:12px" onclick="mark('${k}',${s=='att'?'false':'true'})">Изменить отметку</button>`:''}
+  ${canCancel?`<button class="btn alt sm" id="cx" style="margin-bottom:12px;color:var(--danger)">Отменить запись</button>`:''}
   <div class="row" style="margin:8px 0"><b style="font-family:var(--font-display);font-size:15px" class="grow">${pl?pl.name:'Без плана'}</b><span class="muted small">${pl?pl.items.length+' упр.':''}</span></div>
-  ${pl&&pl.items.length?pl.items.map((it,i)=>exRow(it,i)).join(''):`<div class="card muted">На этот день нет упражнений.</div><button class="btn" style="margin-top:10px" onclick="selWd=${wdOf(d)};closeAll();go('plan')">Собрать план</button>`}
+  ${pl&&pl.items.length?`<div class="list">${pl.items.map((it,i)=>exRow(it,i)).join('')}</div>`:`<div class="card muted">На этот день нет упражнений.</div><button class="btn" style="margin-top:10px" onclick="selWd=${wdOf(d)};closeAll();go('plan')">Собрать план</button>`}
   ${pl&&pl.items.length?mapPair(m=>levelDay(pl,m)):''}`,
-   mount:el=>el.querySelectorAll('[data-ex]').forEach(r=>r.onclick=()=>openEx(r.dataset.ex))})}
+   mount:el=>{el.querySelectorAll('[data-ex]').forEach(r=>r.onclick=()=>openEx(r.dataset.ex));
+     const c=el.querySelector('#cx');if(c)c.onclick=()=>confirmCancel(b)}})}
 function mark(k,v){att[k]=v;saveAtt();if(LIVE){const b=bkOf[k];api({action:'mark',lid:b.lid,sid:b.sid,status:v?'was':'missed'}).catch(()=>toast('Не удалось сохранить отметку'))}stack.pop();toast(v?'Серия растёт 🔥':'Серия сброшена');draw();rCal();openDay(k)}
-window.mark=mark;window.openDay=openDay;window.closeAll=closeAll;
+window.mark=mark;window.openDay=openDay;window.closeAll=closeAll;window.back=back;
 const levelDay=(pl,m)=>{let L=0;for(const it of pl.items){const e=EM[it.id];L=Math.max(L,level(e,m))}return L};
-function exRow(it,i){const e=EM[it.id];return `<button class="ex" data-ex="${e.id}"><div class="mini">${thumb(e)}</div><div class="grow"><div class="nm">${e.n}</div><div class="sub"><span class="tag">${e.eq}</span>${it.s} × ${it.r}${e.u?' '+e.u:''}</div></div>${IC.Rr.replace('<svg','<svg width="18" height="18"')}</button>`}
+function exRow(it,i){const e=EM[it.id];return `<button class="lr" data-ex="${e.id}"><div class="lr-main"><div class="lr-t">${e.n}</div><div class="lr-s">${e.p.map(m=>M[m]).join(', ')} · ${e.eq}</div></div><div class="lr-v">${it.s} × ${it.r}${e.u?' '+e.u:''}${it.w?`<small>${it.w} кг</small>`:''}</div></button>`}
 function thumb(e){const p=mix(e.A,e.B,.6);return `<svg viewBox="40 0 220 200" width="54" height="54">${figure(e,p)}</svg>`}
 
 /* ===== Упражнение: анимация ===== */
@@ -538,54 +569,118 @@ function addEx(id){const d=plan[selWd]||(plan[selWd]={name:'',items:[]});
   d.items.push({id,s:3,r:EM[id].r0||10});if(!d.name)d.name=WD[selWd];savePlan();toast('Добавлено в '+WD[selWd])}
 window.addEx=addEx;
 
+
+/* ===== Мой график и запись ===== */
+const GN={36:'Mariani',283:'Cittadella'};
+const dkey=(k,n)=>{const x=pk(k);x.setDate(x.getDate()+n);return key(x)};
+const mm=t=>+t.slice(0,2)*60+ +t.slice(3,5);
+const slotRef=s=>s.lid+':'+s.sid,slotFree=s=>!s.locked&&s.free>0;
+function occurrences(){if(!SCH||!SCH.rules.length)return [];const out=[],now=SRV_NOW.slice(0,16);
+  for(let i=0;i<14;i++){const date=dkey(TK,i),wd=wdOf(pk(date));
+    for(const r of SCH.rules){if(r.wd!=wd||date+' '+r.start<now)continue;
+      const slot=SCH.slots.find(s=>s.sid==r.sid&&s.date==date&&s.start==r.start);
+      const booked=BK_.find(b=>b.date==date&&b.sid==r.sid&&b.time==r.start);
+      const any=SCH.slots.some(s=>s.date==date);
+      out.push({date,r,booked,st:booked?'booked':!any?'later':(!slot||!slotFree(slot))?'full':'wait'})}}
+  out.sort((x,y)=>(x.date+x.r.start).localeCompare(y.date+y.r.start));return out.slice(0,6)}
+function altsOf(o){const f=SCH.slots.filter(s=>s.date==o.date&&slotFree(s));
+  f.sort((a,b)=>((a.sid==o.r.sid?0:1)-(b.sid==o.r.sid?0:1))||(Math.abs(mm(a.start)-mm(o.r.start))-Math.abs(mm(b.start)-mm(o.r.start))));return f.slice(0,4)}
+function schedHtml(){if(!LIVE||!SCH)return '';
+  if(!SCH.rules.length)return `<h3>Мой график</h3><div class="card muted small">График не задан. Задай его в боте командой /auto, и я буду записывать тебя сам. А пока выбери любой день в календаре и запишись на свободное время.</div>`;
+  const rl=[...SCH.rules].sort((x,y)=>x.wd-y.wd||x.start.localeCompare(y.start)).map(r=>`${WD[r.wd]} ${r.start}`).join(' · ');
+  const txt={booked:'Записан ✓',wait:'Место есть, запишу автоматически',later:'Запись на этот день ещё не открыта',full:'На это время мест нет'};
+  const rows=occurrences().map(o=>{const al=o.st=='full'?altsOf(o):[];
+    return `<div class="lr sch ${o.st}"><div class="lr-main"><div class="lr-t">${fmtDFull(o.date)} · ${o.r.start} · ${GN[o.r.sid]||''}</div><div class="lr-s${o.st=='full'?' warn':''}">${txt[o.st]}${o.st=='full'&&!al.length?'. Свободного времени в этот день нет':''}</div>
+      ${o.st=='full'?`<div class="alts">${al.map(s=>`<button class="chip" data-bk="${slotRef(s)}">${s.start} · ${GN[s.sid]}</button>`).join('')}<button class="chip" data-day="${o.date}">Другой день</button></div>`:''}</div>
+      ${o.st=='booked'?`<button class="lr-a on" data-d="${o.date}" aria-label="Открыть">${IC.ok}</button>`:''}</div>`}).join('');
+  return `<h3>Мой график</h3><div class="small muted" style="margin:-4px 0 10px">${rl}${SCH.auto_on?'':' · автозапись выключена'}</div>${rows?`<div class="list">${rows}</div>`:''}`}
+function pickDay(from){sheet({html:()=>{const days=[];for(let i=1;i<=10;i++){const k=dkey(from,i),n=SCH.slots.filter(s=>s.date==k&&slotFree(s)).length;days.push([k,n])}
+  return `<div class="sh-h"><div class="t">Другой день<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">Где есть свободное время</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
+  <div class="list">${days.map(([k,n])=>`<button class="lr" data-f="${k}"><div class="lr-main"><div class="lr-t">${fmtDFull(k)}</div></div><div class="lr-v">${n?n+' слотов':'нет'}</div></button>`).join('')}</div>`},
+  mount:el=>el.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>openFree(b.dataset.f))})}
+function openFree(date){sheet({html:()=>{const sl=SCH.slots.filter(s=>s.date==date),gyms=[...new Set(sl.map(s=>s.sid))];
+  return `<div class="sh-h"><div class="t">${fmtDFull(date)}<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">Свободное время</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
+  ${sl.length?gyms.map(g=>`<h3>${GN[g]||'UNIME'}</h3><div class="list">${sl.filter(s=>s.sid==g).map(s=>{const ok=slotFree(s);return `<div class="lr"><div class="lr-main"><div class="lr-t">${s.start}–${s.end}</div><div class="lr-s">${ok?`мест: ${s.free} из ${s.max}`:'мест нет'}</div></div>${ok?`<button class="btn sm" data-bk="${slotRef(s)}">Записаться</button>`:'<span class="muted small">занято</span>'}</div>`}).join('')}</div>`).join(''):`<div class="card muted">На этот день слотов пока нет. Запись открывается за несколько дней.</div>`}`},
+  mount:el=>el.querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>confirmBook(b.dataset.bk))})}
+const ERR={login_required:'Нужно войти в бот зала: открой бота и отправь /start',full:'Места только что закончились',past:'Это время уже прошло',slot_not_found:'Слот уже недоступен',not_found:'Запись не найдена'};
+async function bookCall(action,s,btn,label){
+  try{applyServer(await api({action,lid:s.lid,sid:s.sid}),true);closeAll();rCal();if(tab!='cal')go(tab);toast(action=='book'?'Записал ✓':'Запись отменена')}
+  catch(e){toast(ERR[e.code]||(e.msg?'Не вышло: '+e.msg:'Не получилось, попробуй ещё раз'));if(btn){btn.disabled=false;btn.textContent=label}}}
+function confirmBook(ref){const s=SCH&&SCH.slots.find(x=>slotRef(x)==ref);if(!s)return;
+  sheet({html:()=>`<div class="sh-h"><div class="t">Записаться?</div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
+   <div class="card"><b>${GN[s.sid]||'UNIME'}</b><div class="muted">${fmtDFull(s.date)} · ${s.start}–${s.end}</div></div>
+   <div class="row" style="margin-top:12px"><button class="btn good grow" id="cb-y">Записаться</button><button class="btn alt grow" onclick="back()">Назад</button></div>`,
+   mount:el=>{const b=el.querySelector('#cb-y');b.onclick=()=>{b.disabled=true;b.textContent='Записываю…';bookCall('book',s,b,'Записаться')}}})}
+function confirmCancel(b){sheet({html:()=>`<div class="sh-h"><div class="t">Отменить запись?</div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
+   <div class="card"><b>${b.gym}</b><div class="muted">${fmtDFull(b.date)} · ${b.time}</div></div>
+   <div class="row" style="margin-top:12px"><button class="btn alt grow" id="cc-y" style="color:var(--danger)">Отменить запись</button><button class="btn grow" onclick="back()">Оставить</button></div>`,
+   mount:el=>{const x=el.querySelector('#cc-y');x.onclick=()=>{x.disabled=true;x.textContent='Отменяю…';bookCall('cancel',b,x,'Отменить запись')}}})}
+window.confirmBook=confirmBook;
+
 /* ===== Библиотека ===== */
 let q='',eqf='Все',mf='';
+const hasEx=id=>((plan[selWd]||{items:[]}).items).some(i=>i.id==id);
 function rLib(){const eqs=['Все','Штанга','Гантели','Тренажёр','Блок','Свой вес'];
   const list=E.filter(e=>(eqf=='Все'||e.eq==eqf)&&(!mf||e.p.includes(mf)||e.s.includes(mf))&&e.n.toLowerCase().includes(q.toLowerCase()));
   $('#v-lib').innerHTML=`<h1>Упражнения</h1>
   <input class="search" id="q" placeholder="Поиск: жим, присед…" value="${q}">
+  <div class="small muted" style="margin:2px 0 6px">Добавлять в день</div>
+  <div class="chips">${WD.map((w,i)=>`<button class="chip ${selWd==i?'on':''}" data-wd="${i}">${w}</button>`).join('')}</div>
   <div class="chips">${eqs.map(e=>`<button class="chip ${eqf==e?'on':''}" data-eq="${e}">${e}</button>`).join('')}</div>
   <div class="chips">${Object.entries(M).map(([k,v])=>`<button class="chip ${mf==k?'on':''}" data-m="${k}">${v}</button>`).join('')}</div>
-  <div class="small muted" style="margin:2px 0 10px">${list.length} из ${E.length} · тапни — анимация и разбор</div>
-  ${list.map(e=>`<button class="ex" data-ex="${e.id}"><div class="mini">${thumb(e)}</div><div class="grow"><div class="nm">${e.n}</div><div class="sub"><span class="tag">${e.eq}</span>${e.p.map(m=>`<span><i class="dot r"></i> ${M[m]}</span>`).join('')}</div></div></button>`).join('')||'<div class="card muted">Ничего не найдено</div>'}`;
+  <div class="small muted" style="margin:2px 0 10px">${list.length} из ${E.length} · тап по названию — анимация и разбор</div>
+  ${list.length?`<div class="list">${list.map(e=>{const on=hasEx(e.id);return `<div class="lr"><button class="lr-main" data-ex="${e.id}"><div class="lr-t">${e.n}</div><div class="lr-s">${e.p.map(m=>M[m]).join(', ')} · ${e.eq}</div></button><button class="lr-a ${on?'on':''}" data-add="${e.id}" aria-label="В план">${on?IC.ok:'+'}</button></div>`}).join('')}</div>`:'<div class="card muted">Ничего не найдено</div>'}`;
   const el=$('#v-lib');el.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>openEx(b.dataset.ex));
   el.querySelectorAll('[data-eq]').forEach(b=>b.onclick=()=>{eqf=b.dataset.eq;rLib()});
+  el.querySelectorAll('[data-wd]').forEach(b=>b.onclick=()=>{selWd=+b.dataset.wd;rLib()});
   el.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{mf=mf==b.dataset.m?'':b.dataset.m;rLib()});
+  el.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const id=b.dataset.add,dd=plan[selWd]||(plan[selWd]={name:'',items:[]}),ix=dd.items.findIndex(i=>i.id==id);
+    if(ix>=0){dd.items.splice(ix,1);if(!dd.items.length)dd.name=''}else{dd.items.push({id,s:3,r:EM[id].r0||10});if(!dd.name)dd.name=WD[selWd]}savePlan();rLib()});
   const i=$('#q');i.oninput=()=>{q=i.value;const p=i.selectionStart;rLib();const n=$('#q');n.focus();n.setSelectionRange(p,p)}}
 
 /* ===== Конструктор плана ===== */
 function rPlan(){const d=plan[selWd]||{name:'',items:[]},wdn=['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
   $('#v-plan').innerHTML=`<h1>Мой план</h1>
   <div class="days">${WD.map((w,i)=>{const p=plan[i];return `<button class="dw ${i==selWd?'sel':''} ${p&&p.items.length?'has':''}" data-w="${i}"><b>${w}</b><i>${p&&p.items.length?(p.name||p.items.length):'—'}</i></button>`}).join('')}</div>
-  <h3 style="margin-top:6px">Комбо — добавь одним тапом</h3>
+  <h3 style="margin-top:6px">Комбо: добавь одним тапом</h3>
   <div class="combos">${COMBOS.map(c=>`<button class="combo" data-c="${c.id}"><b>${c.n}</b><div class="ms">${c.m.map(m=>M[m]).join(' · ')}</div><div class="cnt">${c.ex.length} упражнений · +</div></button>`).join('')}</div>
   <div class="row" style="margin:14px 0 8px"><h3 style="margin:0" class="grow">${wdn[selWd]}${d.name?' · '+d.name:''}</h3>${d.items.length?'<button class="chip" id="clr">очистить</button>':''}</div>
-  ${d.items.length?d.items.map((it,i)=>{const e=EM[it.id],u=e.u?5:1;return `<div class="ex" style="display:block"><div class="row"><div class="n">${i+1}</div><div class="grow" data-ex="${e.id}" style="cursor:pointer"><div class="nm">${e.n}</div><div class="sub"><span class="tag">${e.eq}</span>${e.p.map(m=>M[m]).join(', ')}</div></div><button class="sq" data-up="${i}">↑</button><button class="sq" data-rm="${i}">✕</button></div>
-   <div class="pr"><span class="muted small">Подходы</span><div class="ctl"><button class="sq" data-s="${i},-1">−</button><span class="val">${it.s}</span><button class="sq" data-s="${i},1">+</button></div>
-   <span class="muted small" style="margin-left:10px">${e.u||'Повторы'}</span><div class="ctl"><button class="sq" data-r="${i},${-u}">−</button><span class="val">${it.r}</span><button class="sq" data-r="${i},${u}">+</button></div></div></div>`}).join(''):'<div class="card muted">День пуст. Выбери комбо выше или добавь упражнения вручную.</div>'}
-  <button class="btn alt" id="add" style="margin-top:6px">+ Добавить упражнение</button>
+  ${d.items.length?`<div class="small muted" style="margin:-2px 0 8px">Тап по упражнению: подходы, повторы, вес</div><div class="list">${d.items.map((it,i)=>{const e=EM[it.id];return `<button class="lr" data-edit="${i}"><span class="n">${i+1}</span><div class="lr-main"><div class="lr-t">${e.n}</div><div class="lr-s">${e.p.map(m=>M[m]).join(', ')} · ${e.eq}</div></div><div class="lr-v">${it.s} × ${it.r}${e.u?' '+e.u:''}<small>${it.w?it.w+' кг':'без веса'}</small></div></button>`}).join('')}</div>`:'<div class="card muted">День пуст. Выбери комбо выше или добавь упражнения вручную.</div>'}
+  <button class="btn alt" id="add" style="margin-top:12px">+ Добавить упражнение</button>
   ${d.items.length?`<h3>Что прокачается в этот день</h3>${mapPair(m=>levelDay(d,m))}`:''}`;
   const el=$('#v-plan');
   el.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{selWd=+b.dataset.w;rPlan()});
   el.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>{const c=COMBOS.find(x=>x.id==b.dataset.c);const dd=plan[selWd]||(plan[selWd]={name:'',items:[]});
     let n=0;for(const id of c.ex)if(!dd.items.find(i=>i.id==id)){dd.items.push({id,s:3,r:EM[id].r0||10});n++}
     if(!dd.name||dd.items.length==n)dd.name=c.n;savePlan();toast(`${c.n}: +${n} упр.`);rPlan()});
-  el.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>openEx(b.dataset.ex,{noAdd:1}));
-  el.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{d.items.splice(+b.dataset.rm,1);if(!d.items.length)d.name='';savePlan();rPlan()});
-  el.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;if(i>0){[d.items[i-1],d.items[i]]=[d.items[i],d.items[i-1]];savePlan();rPlan()}});
-  el.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{const [i,v]=b.dataset.s.split(',').map(Number);d.items[i].s=Math.max(1,Math.min(10,d.items[i].s+v));savePlan();rPlan()});
-  el.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const [i,v]=b.dataset.r.split(',').map(Number);d.items[i].r=Math.max(1,Math.min(100,d.items[i].r+v));savePlan();rPlan()});
+  el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>editItem(+b.dataset.edit));
   const c=$('#clr');if(c)c.onclick=()=>{plan[selWd]={name:'',items:[]};savePlan();rPlan()};
   $('#add').onclick=pick}
+const stp=(label,k,val,suffix)=>`<div class="stp"><span>${label}</span><div class="ctl"><button class="sq" data-k="${k}" data-v="-1" aria-label="Меньше">−</button><span class="val">${val}${suffix||''}</span><button class="sq" data-k="${k}" data-v="1" aria-label="Больше">+</button></div></div>`;
+function editItem(i0){let idx=i0;const d=plan[selWd];
+  sheet({html:()=>{const it=d.items[idx],e=EM[it.id];
+    return `<div class="sh-h"><div class="t">${e.n}<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">${WD[selWd]} · ${e.eq}</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
+    <div class="card" style="padding:4px 14px">${stp('Подходы','s',it.s)}${stp(e.u?'Длительность, '+e.u:'Повторы','r',it.r)}${stp('Вес, кг','w',it.w||'—')}</div>
+    <div class="row" style="margin:12px 0 8px"><button class="btn alt sm grow" id="mvu">↑ Выше</button><button class="btn alt sm grow" id="mvd">↓ Ниже</button></div>
+    <button class="btn alt" id="how">Как делать · анимация</button>
+    <button class="btn alt" id="rmv" style="margin-top:8px;color:var(--danger)">Убрать из плана</button>`},
+  mount:el=>{const it=()=>d.items[idx];
+    el.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const x=it(),e=EM[x.id],k=b.dataset.k,st=k=='w'?2.5:k=='r'?(e.u?5:1):1,lim={s:[1,10],r:[1,100],w:[0,300]}[k];
+      let v=(x[k]||0)+(+b.dataset.v)*st;v=Math.max(lim[0],Math.min(lim[1],Math.round(v*10)/10));x[k]=v;if(k=='w'&&!v)delete x.w;savePlan();draw();rPlan()});
+    el.querySelector('#mvu').onclick=()=>{if(idx>0){[d.items[idx-1],d.items[idx]]=[d.items[idx],d.items[idx-1]];idx--;savePlan();draw();rPlan()}};
+    el.querySelector('#mvd').onclick=()=>{if(idx<d.items.length-1){[d.items[idx+1],d.items[idx]]=[d.items[idx],d.items[idx+1]];idx++;savePlan();draw();rPlan()}};
+    el.querySelector('#how').onclick=()=>openEx(it().id,{noAdd:1});
+    el.querySelector('#rmv').onclick=()=>{d.items.splice(idx,1);if(!d.items.length)d.name='';savePlan();closeAll();rPlan()}}})}
 let pq='',pm='';
 function pick(){sheet({html:()=>`<div class="sh-h"><div class="t">Добавить в ${WD[selWd]}</div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
   <input class="search" id="pq" placeholder="Поиск" value="${pq}">
   <div class="chips">${Object.entries(M).map(([k,v])=>`<button class="chip ${pm==k?'on':''}" data-m="${k}">${v}</button>`).join('')}</div><div id="pl"></div>`,
   mount:el=>{const paint=()=>{const d=plan[selWd]||{items:[]};
-    $('#pl').innerHTML=E.filter(e=>(!pm||e.p.includes(pm))&&e.n.toLowerCase().includes(pq.toLowerCase())).map(e=>{const on=d.items.find(i=>i.id==e.id);
-      return `<div class="ex"><div class="mini" data-i="${e.id}">${thumb(e)}</div><div class="grow" data-i="${e.id}"><div class="nm">${e.n}</div><div class="sub"><span class="tag">${e.eq}</span>${e.p.map(m=>M[m]).join(', ')}</div></div><button class="sq" style="${on?'background:var(--accent);color:#fff;border-color:var(--accent)':''}" data-a="${e.id}">${on?'✓':'+'}</button></div>`}).join('')
+    const L=E.filter(e=>(!pm||e.p.includes(pm))&&e.n.toLowerCase().includes(pq.toLowerCase()));
+    $('#pl').innerHTML=L.length?`<div class="list">${L.map(e=>{const on=d.items.find(i=>i.id==e.id);
+      return `<div class="lr"><button class="lr-main" data-i="${e.id}"><div class="lr-t">${e.n}</div><div class="lr-s">${e.p.map(m=>M[m]).join(', ')} · ${e.eq}</div></button><button class="lr-a ${on?'on':''}" data-a="${e.id}" aria-label="В план">${on?IC.ok:'+'}</button></div>`}).join('')}</div>`:'<div class="card muted">Ничего не найдено</div>';
     $('#pl').querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const id=b.dataset.a,dd=plan[selWd]||(plan[selWd]={name:'',items:[]}),ix=dd.items.findIndex(i=>i.id==id);
-      if(ix>=0)dd.items.splice(ix,1);else dd.items.push({id,s:3,r:EM[id].r0||10});savePlan();paint()});
+      if(ix>=0)dd.items.splice(ix,1);else dd.items.push({id,s:3,r:EM[id].r0||10});savePlan();paint();rPlan()});
     $('#pl').querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>openEx(b.dataset.i,{noAdd:1}))};
     paint();$('#pq').oninput=e=>{pq=e.target.value;paint()};
     el.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{pm=pm==b.dataset.m?'':b.dataset.m;el.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x.dataset.m==pm));paint()});
