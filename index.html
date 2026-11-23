@@ -453,7 +453,7 @@ document.getElementById('dock').innerHTML=[['cal','Календарь'],['lib','
 /* ===== Сервер (Mini App в Telegram) ===== */
 const TGW=window.Telegram&&window.Telegram.WebApp,INIT=(TGW&&TGW.initData)||'',LIVE=!!INIT;
 const API='https://ntgomhodhsjcccjscgci.supabase.co/functions/v1/app';
-async function api(body){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':INIT},body:JSON.stringify(body)});if(!r.ok){let c='',m='';try{const j=await r.json();c=j.error||'';m=j.message||''}catch(e){}const er=new Error(r.status);er.code=c;er.msg=m;throw er}return r.json()}
+async function api(body){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':INIT},body:JSON.stringify(body)});if(!r.ok){let c='',m='',rs;try{const j=await r.json();c=j.error||'';m=j.message||'';rs=j.restored}catch(e){}const er=new Error(r.status);er.code=c;er.msg=m;er.restored=rs;throw er}return r.json()}
 let PROFILE=null;
 let plan=LIVE?null:rd('ug_plan',null);
 if(!plan){const mk=(id,n,ids)=>({name:n,items:ids.map(i=>({id:i,s:3,r:EM[i].r0||10}))});
@@ -590,6 +590,7 @@ const GN={36:'Mariani',283:'Cittadella'};
 const dkey=(k,n)=>{const x=pk(k);x.setDate(x.getDate()+n);return key(x)};
 const mm=t=>+t.slice(0,2)*60+ +t.slice(3,5);
 const slotRef=s=>s.lid+':'+s.sid,slotFree=s=>!s.locked&&s.free>0;
+const activeBk=()=>LIVE?BK_.find(b=>b.date>=TK&&!isOver(b)):null;
 function occurrences(){if(!SCH||!SCH.rules.length)return [];const out=[],now=SRV_NOW.slice(0,16);
   for(let i=0;i<14;i++){const date=dkey(TK,i),wd=wdOf(pk(date));
     for(const r of SCH.rules){if(r.wd!=wd||date+' '+r.start<now)continue;
@@ -598,14 +599,14 @@ function occurrences(){if(!SCH||!SCH.rules.length)return [];const out=[],now=SRV
       const any=SCH.slots.some(s=>s.date==date);
       out.push({date,r,booked:booked||other,other:!!other,st:booked?'booked':other?'other':!any?'later':(!slot||!slotFree(slot))?'full':'wait'})}}
   out.sort((x,y)=>(x.date+x.r.start).localeCompare(y.date+y.r.start));
-  let first=true;for(const o of out){if(o.st=='booked'||o.st=='other')continue;if(first)first=false;else if(o.st=='wait')o.st='queue'}
+  const act=activeBk();for(const o of out){if(o.st=='booked'||o.st=='other')continue;if(act)o.st='queue'}
   return out.slice(0,6)}
 function altsOf(o){const f=SCH.slots.filter(s=>s.date==o.date&&slotFree(s));
   f.sort((a,b)=>((a.sid==o.r.sid?0:1)-(b.sid==o.r.sid?0:1))||(Math.abs(mm(a.start)-mm(o.r.start))-Math.abs(mm(b.start)-mm(o.r.start))));return f.slice(0,4)}
 function schedHtml(){if(!LIVE||!SCH)return '';
   if(!SCH.rules.length)return `<h3>Мой график</h3><div class="card muted small">График не задан. Задай его в боте командой /auto, и я буду записывать тебя сам. А пока выбери любой день в календаре и запишись на свободное время.</div>`;
   const rl=[...SCH.rules].sort((x,y)=>x.wd-y.wd||x.start.localeCompare(y.start)).map(r=>`${WD[r.wd]} ${r.start}`).join(' · ');
-  const txt={booked:'Записан ✓',wait:'Место есть, запишу автоматически',queue:'Запишу после предыдущей тренировки',later:'Запись на этот день ещё не открыта',full:'На это время мест нет'};
+  const txt={booked:'Записан ✓',wait:'Место есть, запишу автоматически',queue:'Запишу после текущей тренировки',later:'Запись на этот день ещё не открыта',full:'На это время мест нет'};
   const rows=occurrences().map(o=>{const al=o.st=='full'?altsOf(o):[];
     return `<div class="lr sch ${o.st}"><div class="lr-main"><div class="lr-t">${fmtDFull(o.date)} · ${o.other?o.booked.time+' · '+o.booked.gym:o.r.start+' · '+(GN[o.r.sid]||'')}</div><div class="lr-s${o.st=='full'?' warn':''}">${o.other?'Записан на '+o.booked.time+' (в графике '+o.r.start+')':txt[o.st]}${o.st=='full'&&!al.length?'. Свободного времени в этот день нет':''}</div>
       ${o.st=='full'?`<div class="alts">${al.map(s=>`<button class="chip" data-bk="${slotRef(s)}">${s.start} · ${GN[s.sid]}</button>`).join('')}<button class="chip" data-day="${o.date}">Другой день</button></div>`:''}</div>
@@ -617,17 +618,23 @@ function pickDay(from){sheet({html:()=>{const days=[];for(let i=1;i<=10;i++){con
   mount:el=>el.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>openFree(b.dataset.f))})}
 function openFree(date){sheet({html:()=>{const sl=SCH.slots.filter(s=>s.date==date),gyms=[...new Set(sl.map(s=>s.sid))];
   return `<div class="sh-h"><div class="t">${fmtDFull(date)}<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">Свободное время</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
-  ${sl.length?gyms.map(g=>`<h3>${GN[g]||'UNIME'}</h3><div class="list">${sl.filter(s=>s.sid==g).map(s=>{const ok=slotFree(s);return `<div class="lr"><div class="lr-main"><div class="lr-t">${s.start}–${s.end}</div><div class="lr-s">${ok?`мест: ${s.free} из ${s.max}`:'мест нет'}</div></div>${ok?`<button class="btn sm" data-bk="${slotRef(s)}">Записаться</button>`:'<span class="muted small">занято</span>'}</div>`}).join('')}</div>`).join(''):`<div class="card muted">На этот день слотов пока нет. Запись открывается за несколько дней.</div>`}`},
+  ${activeBk()?`<div class="card" style="margin-bottom:12px;font-size:13.5px">Сайт даёт одну активную запись: сейчас у тебя <b>${fmtDFull(activeBk().date)} · ${activeBk().time}</b>. Новую можно сделать после неё или перенести запись на другое время.</div>`:''}
+  ${sl.length?gyms.map(g=>`<h3>${GN[g]||'UNIME'}</h3><div class="list">${sl.filter(s=>s.sid==g).map(s=>{const ok=slotFree(s);return `<div class="lr"><div class="lr-main"><div class="lr-t">${s.start}–${s.end}</div><div class="lr-s">${ok?`мест: ${s.free} из ${s.max}`:'мест нет'}</div></div>${ok?`<button class="btn sm" data-bk="${slotRef(s)}">${activeBk()?'Перенести':'Записаться'}</button>`:'<span class="muted small">занято</span>'}</div>`}).join('')}</div>`).join(''):`<div class="card muted">На этот день слотов пока нет. Запись открывается за несколько дней.</div>`}`},
   mount:el=>el.querySelectorAll('[data-bk]').forEach(b=>b.onclick=()=>confirmBook(b.dataset.bk))})}
-const ERR={login_required:'Нужно войти в бот зала: открой бота и отправь /start',full:'Места только что закончились',past:'Это время уже прошло',slot_not_found:'Слот уже недоступен',not_found:'Запись не найдена'};
-async function bookCall(action,s,btn,label){
-  try{applyServer(await api({action,lid:s.lid,sid:s.sid}),true);closeAll();rCal();if(tab!='cal')go(tab);toast(action=='book'?'Записал ✓':'Запись отменена')}
-  catch(e){toast(ERR[e.code]||(e.msg?'Не вышло: '+e.msg:'Не получилось, попробуй ещё раз'));if(btn){btn.disabled=false;btn.textContent=label}}}
-function confirmBook(ref){const s=SCH&&SCH.slots.find(x=>slotRef(x)==ref);if(!s)return;
+const ERR={has_active:'У тебя уже есть активная запись. Сначала отмени её или перенеси',login_required:'Нужно войти в бот зала: открой бота и отправь /start',full:'Места только что закончились',past:'Это время уже прошло',slot_not_found:'Слот уже недоступен',not_found:'Запись не найдена'};
+async function bookCall(action,s,btn,label,extra){
+  try{applyServer(await api(Object.assign({action,lid:s.lid,sid:s.sid},extra||{})),true);closeAll();rCal();if(tab!='cal')go(tab);toast(action=='cancel'?'Запись отменена':action=='move'?'Перенёс ✓':'Записал ✓')}
+  catch(e){if(e.restored===false)toast('Не удалось записать на новое время, старая запись тоже снята. Запишись заново');else toast(ERR[e.code]||(e.msg?'Не вышло: '+e.msg:'Не получилось, попробуй ещё раз'));if(btn){btn.disabled=false;btn.textContent=label}}}
+function confirmBook(ref){const s=SCH&&SCH.slots.find(x=>slotRef(x)==ref);if(!s)return;const act=activeBk();if(act)return confirmMove(s,act);
   sheet({html:()=>`<div class="sh-h"><div class="t">Записаться?</div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
    <div class="card"><b>${GN[s.sid]||'UNIME'}</b><div class="muted">${fmtDFull(s.date)} · ${s.start}–${s.end}</div></div>
    <div class="row" style="margin-top:12px"><button class="btn good grow" id="cb-y">Записаться</button><button class="btn alt grow" onclick="back()">Назад</button></div>`,
    mount:el=>{const b=el.querySelector('#cb-y');b.onclick=()=>{b.disabled=true;b.textContent='Записываю…';bookCall('book',s,b,'Записаться')}}})}
+function confirmMove(s,o){sheet({html:()=>`<div class="sh-h"><div class="t">Перенести запись?</div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
+   <div class="card"><div class="muted small">Отменю</div><b>${o.gym}</b><div class="muted">${fmtDFull(o.date)} · ${o.time}</div></div>
+   <div class="card" style="margin-top:8px"><div class="muted small">И запишу</div><b>${GN[s.sid]||'UNIME'}</b><div class="muted">${fmtDFull(s.date)} · ${s.start}–${s.end}</div></div>
+   <div class="row" style="margin-top:12px"><button class="btn good grow" id="mv-y">Перенести</button><button class="btn alt grow" onclick="back()">Назад</button></div>`,
+   mount:el=>{const b=el.querySelector('#mv-y');b.onclick=()=>{b.disabled=true;b.textContent='Переношу…';bookCall('move',s,b,'Перенести',{old_lid:o.lid,old_sid:o.sid})}}})}
 function confirmCancel(b){sheet({html:()=>`<div class="sh-h"><div class="t">Отменить запись?</div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
    <div class="card"><b>${b.gym}</b><div class="muted">${fmtDFull(b.date)} · ${b.time}</div></div>
    <div class="row" style="margin-top:12px"><button class="btn alt grow" id="cc-y" style="color:var(--danger)">Отменить запись</button><button class="btn grow" onclick="back()">Оставить</button></div>`,
