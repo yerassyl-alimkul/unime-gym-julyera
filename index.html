@@ -593,20 +593,22 @@ function occurrences(){if(!SCH||!SCH.rules.length)return [];const out=[],now=SRV
   for(let i=0;i<14;i++){const date=dkey(TK,i),wd=wdOf(pk(date));
     for(const r of SCH.rules){if(r.wd!=wd||date+' '+r.start<now)continue;
       const slot=SCH.slots.find(s=>s.sid==r.sid&&s.date==date&&s.start==r.start);
-      const booked=BK_.find(b=>b.date==date&&b.sid==r.sid&&b.time==r.start);
+      const booked=BK_.find(b=>b.date==date&&b.time==r.start&&b.sid==r.sid),other=booked?null:BK_.find(b=>b.date==date);
       const any=SCH.slots.some(s=>s.date==date);
-      out.push({date,r,booked,st:booked?'booked':!any?'later':(!slot||!slotFree(slot))?'full':'wait'})}}
-  out.sort((x,y)=>(x.date+x.r.start).localeCompare(y.date+y.r.start));return out.slice(0,6)}
+      out.push({date,r,booked:booked||other,other:!!other,st:booked?'booked':other?'other':!any?'later':(!slot||!slotFree(slot))?'full':'wait'})}}
+  out.sort((x,y)=>(x.date+x.r.start).localeCompare(y.date+y.r.start));
+  let first=true;for(const o of out){if(o.st=='booked'||o.st=='other')continue;if(first)first=false;else if(o.st=='wait')o.st='queue'}
+  return out.slice(0,6)}
 function altsOf(o){const f=SCH.slots.filter(s=>s.date==o.date&&slotFree(s));
   f.sort((a,b)=>((a.sid==o.r.sid?0:1)-(b.sid==o.r.sid?0:1))||(Math.abs(mm(a.start)-mm(o.r.start))-Math.abs(mm(b.start)-mm(o.r.start))));return f.slice(0,4)}
 function schedHtml(){if(!LIVE||!SCH)return '';
   if(!SCH.rules.length)return `<h3>Мой график</h3><div class="card muted small">График не задан. Задай его в боте командой /auto, и я буду записывать тебя сам. А пока выбери любой день в календаре и запишись на свободное время.</div>`;
   const rl=[...SCH.rules].sort((x,y)=>x.wd-y.wd||x.start.localeCompare(y.start)).map(r=>`${WD[r.wd]} ${r.start}`).join(' · ');
-  const txt={booked:'Записан ✓',wait:'Место есть, запишу автоматически',later:'Запись на этот день ещё не открыта',full:'На это время мест нет'};
+  const txt={booked:'Записан ✓',wait:'Место есть, запишу автоматически',queue:'Запишу после предыдущей тренировки',later:'Запись на этот день ещё не открыта',full:'На это время мест нет'};
   const rows=occurrences().map(o=>{const al=o.st=='full'?altsOf(o):[];
-    return `<div class="lr sch ${o.st}"><div class="lr-main"><div class="lr-t">${fmtDFull(o.date)} · ${o.r.start} · ${GN[o.r.sid]||''}</div><div class="lr-s${o.st=='full'?' warn':''}">${txt[o.st]}${o.st=='full'&&!al.length?'. Свободного времени в этот день нет':''}</div>
+    return `<div class="lr sch ${o.st}"><div class="lr-main"><div class="lr-t">${fmtDFull(o.date)} · ${o.other?o.booked.time+' · '+o.booked.gym:o.r.start+' · '+(GN[o.r.sid]||'')}</div><div class="lr-s${o.st=='full'?' warn':''}">${o.other?'Записан на '+o.booked.time+' (в графике '+o.r.start+')':txt[o.st]}${o.st=='full'&&!al.length?'. Свободного времени в этот день нет':''}</div>
       ${o.st=='full'?`<div class="alts">${al.map(s=>`<button class="chip" data-bk="${slotRef(s)}">${s.start} · ${GN[s.sid]}</button>`).join('')}<button class="chip" data-day="${o.date}">Другой день</button></div>`:''}</div>
-      ${o.st=='booked'?`<button class="lr-a on" data-d="${o.date}" aria-label="Открыть">${IC.ok}</button>`:''}</div>`}).join('');
+      ${o.st=='booked'||o.other?`<button class="lr-a on" data-d="${o.date}" aria-label="Открыть">${IC.ok}</button>`:''}</div>`}).join('');
   return `<h3>Мой график</h3><div class="small muted" style="margin:-4px 0 10px">${rl}${SCH.auto_on?'':' · автозапись выключена'}</div>${rows?`<div class="list">${rows}</div>`:''}`}
 function pickDay(from){sheet({html:()=>{const days=[];for(let i=1;i<=10;i++){const k=dkey(from,i),n=SCH.slots.filter(s=>s.date==k&&slotFree(s)).length;days.push([k,n])}
   return `<div class="sh-h"><div class="t">Другой день<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">Где есть свободное время</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
