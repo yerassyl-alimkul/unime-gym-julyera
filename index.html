@@ -626,7 +626,7 @@ function openFree(date){sheet({html:()=>{const sl=SCH.slots.filter(s=>s.date==da
 /* Редактор графика автозаписи */
 const WDL=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 let addSid=0,addWd=-1;
-async function schedCall(body,msg){try{applyServer(await api(body),true);rCal();if(tab!='cal')go(tab);if(msg)toast(msg);return true}catch(e){toast(e.code=='rules_limit'?'В графике уже 7 тренировок. Убери одну':'Не получилось, попробуй ещё раз');return false}}
+async function schedCall(body,msg){try{applyServer(await api(body),true);rCal();if(tab!='cal')go(tab);if(msg)toast(msg);return true}catch(e){if(e.code=='day_taken'){askReplace(body,e.msg);return false}toast(e.code=='rules_limit'?'В графике уже 7 тренировок. Убери одну':'Не получилось, попробуй ещё раз');return false}}
 function editSched(){addSid=0;addWd=-1;sheet({html:()=>{const rs=[...SCH.rules].sort((x,y)=>x.wd-y.wd||x.start.localeCompare(y.start));
   return `<div class="sh-h"><div class="t">Мой график<div class="muted small" style="font-family:var(--font-text);font-weight:400;margin-top:4px">Как только заканчивается одна тренировка, запишу на следующую</div></div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
   ${rs.length?`<div class="list">${rs.map(r=>`<div class="lr"><div class="lr-main"><div class="lr-t">${WDL[r.wd]} · ${r.start}</div><div class="lr-s">${GN[r.sid]||'UNIME'}</div></div><button class="btn alt sm" data-rd="${r.sid}|${r.wd}|${r.start}" style="color:var(--danger)">Убрать</button></div>`).join('')}</div>`:'<div class="card muted small">Пока пусто. Добавь первую тренировку.</div>'}
@@ -641,6 +641,13 @@ function editSched(){addSid=0;addWd=-1;sheet({html:()=>{const rs=[...SCH.rules].
    el.querySelectorAll('[data-aw]').forEach(b=>b.onclick=()=>{addWd=+b.dataset.aw;draw()});
    el.querySelectorAll('[data-at]').forEach(b=>b.onclick=async()=>{b.disabled=true;if(await schedCall({action:'rule_add',sid:addSid,wd:addWd,start:b.dataset.at},'Добавил в график')){addSid=0;addWd=-1;draw()}else b.disabled=false});
    const a=el.querySelector('#sc-auto');a.onclick=async()=>{a.disabled=true;await schedCall({action:'auto',on:!SCH.auto_on},SCH.auto_on?'Автозапись включена':'Автозапись выключена');draw()}}})}
+function askReplace(body,old){const[os,ost]=String(old||'|').split('|');const day=WDL[body.wd];
+  sheet({html:()=>`<div class="sh-h"><div class="t">На ${day} уже есть тренировка</div><button class="ib" onclick="closeAll()">${IC.x}</button></div>
+   <div class="card"><div class="muted small">Сейчас в графике</div><b>${day} · ${ost}</b><div class="muted">${GN[os]||'UNIME'}</div></div>
+   <div class="card" style="margin-top:8px"><div class="muted small">Хочешь поставить</div><b>${day} · ${body.start}</b><div class="muted">${GN[body.sid]||'UNIME'}</div></div>
+   <div class="muted small" style="margin:10px 0">Сайт даёт одну запись за раз, поэтому вторая тренировка в тот же день не сработает. Заменить старую на новую?</div>
+   <div class="row"><button class="btn good grow" id="rp-y">Заменить</button><button class="btn alt grow" onclick="back()">Оставить</button></div>`,
+   mount:el=>{const b=el.querySelector('#rp-y');b.onclick=async()=>{b.disabled=true;b.textContent='Меняю…';if(await schedCall(Object.assign({},body,{replace:true}),'Заменил')){closeAll()}else{b.disabled=false;b.textContent='Заменить'}}}})}
 function addTimes(){const seen=new Map();for(const s of SCH.slots){if(s.sid!=addSid)continue;if(wdOf(pk(s.date))!=addWd)continue;seen.set(s.start,s.end)}
   const have=new Set(SCH.rules.filter(r=>r.sid==addSid&&r.wd==addWd).map(r=>r.start));
   const ts=[...seen.entries()].filter(([st])=>!have.has(st)).sort((a,b)=>a[0].localeCompare(b[0]));
