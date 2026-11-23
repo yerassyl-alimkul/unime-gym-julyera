@@ -469,14 +469,15 @@ let BK_=[];
     if(w==0||w==2||w==4)BK_.push({date:key(d),time:w==2?'19:00':'18:00',gym:w==2?'Cittadella':'Mariani'})}})();
 const past=BK_.filter(b=>b.date<TK).reverse(); // новые → старые
 const seed={};past.forEach((b,i)=>{if(i==0)return;seed[b.date]=!(i==7||i==13)});
+const isOver=b=>!!(LIVE&&SRV_NOW&&b.end&&(b.date+' '+b.end)<=SRV_NOW.slice(0,16));
 const stOf=b=>{if(att[b.date]!==undefined)return att[b.date]?'att':'miss';
-  if(b.date>TK)return 'up';if(b.date==TK)return 'today';
+  if(b.date>TK)return 'up';if(b.date==TK)return isOver(b)?'pend':'today';
   return seed[b.date]===undefined?'pend':seed[b.date]?'att':'miss'};
 let bkOf=Object.fromEntries(BK_.map(b=>[b.date,b]));
 const GYM={36:'Mariani',283:'Cittadella'};
 let SCH=null,SRV_NOW='';
 function applyServer(s,keepPlan){PROFILE=s.profile||{};SCH=s.schedule||null;SRV_NOW=s.now||SRV_NOW;
-  BK_=(s.bookings||[]).map(x=>{const t=String(x.start_local).replace(' ','T');return {date:t.slice(0,10),time:t.slice(11,16),gym:GYM[x.sid]||'UNIME',lid:x.lid,sid:x.sid}});
+  BK_=(s.bookings||[]).map(x=>{const t=String(x.start_local).replace(' ','T');return {date:t.slice(0,10),time:t.slice(11,16),end:String(x.end_local||'').replace(' ','T').slice(11,16),gym:GYM[x.sid]||'UNIME',lid:x.lid,sid:x.sid}});
   bkOf=Object.fromEntries(BK_.map(b=>[b.date,b]));
   const byRef={};BK_.forEach(b=>byRef[b.lid+':'+b.sid]=b);att={};
   (s.attendance||[]).forEach(x=>{const b=byRef[x.lid+':'+x.sid];if(b)att[b.date]=x.status=='was'});
@@ -517,7 +518,7 @@ function rCal(){
   <div class="cal-h"><div class="t">${MN[m]} ${y}</div><button class="ib" id="pm">${IC.L}</button><button class="ib" id="nm">${IC.Rr}</button></div>
   <div class="wk">${WD.map(w=>`<span>${w}</span>`).join('')}</div><div class="grid">${g}</div>
   <div class="legend"><span><i style="background:var(--accent)"></i>был</span><span><i style="border:2px solid var(--accent)"></i>запись</span><span><i style="background:var(--yellow)"></i>отметь</span><span><i style="background:rgba(179,38,30,.35)"></i>пропуск</span></div>
-  ${schedHtml()}<h3>Ближайшие</h3>${BK_.filter(b=>b.date>=TK).slice(0,3).map(b=>bkRow(b)).join('')}`;
+  ${schedHtml()}<h3>Ближайшие</h3>${BK_.filter(b=>b.date>=TK&&!isOver(b)).slice(0,3).map(b=>bkRow(b)).join('')}`;
   $('#pm').onclick=()=>{vm=new Date(y,m-1,1);rCal()};$('#nm').onclick=()=>{vm=new Date(y,m+1,1);rCal()};
   $('#v-cal').querySelectorAll('[data-d]').forEach(b=>b.onclick=()=>openDay(b.dataset.d));
   $('#v-cal').querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>openFree(b.dataset.f));
