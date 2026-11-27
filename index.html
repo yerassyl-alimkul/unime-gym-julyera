@@ -478,9 +478,12 @@ const GYM={36:'Mariani',283:'Cittadella'};
 let SCH=null,SRV_NOW='';
 function applyServer(s,keepPlan){PROFILE=s.profile||{};SCH=s.schedule||null;SRV_NOW=s.now||SRV_NOW;
   BK_=(s.bookings||[]).map(x=>{const t=String(x.start_local).replace(' ','T');return {date:t.slice(0,10),time:t.slice(11,16),end:String(x.end_local||'').replace(' ','T').slice(11,16),gym:GYM[x.sid]||'UNIME',lid:x.lid,sid:x.sid}});
-  bkOf=Object.fromEntries(BK_.map(b=>[b.date,b]));
-  const byRef={};BK_.forEach(b=>byRef[b.lid+':'+b.sid]=b);att={};
-  (s.attendance||[]).forEach(x=>{const b=byRef[x.lid+':'+x.sid];if(b)att[b.date]=x.status=='was'});
+  /* номер занятия повторяется каждую неделю, поэтому отметки привязаны к дате; прошлую бронь, которую заменила новая, берём из отметки */
+  const have=new Set(BK_.map(b=>b.date));
+  (s.attendance||[]).forEach(x=>{const t=String(x.start_local).replace(' ','T'),d=t.slice(0,10);if(!have.has(d)){have.add(d);BK_.push({date:d,time:t.slice(11,16),end:'',gym:GYM[x.sid]||'UNIME',lid:x.lid,sid:x.sid})}});
+  BK_.sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  bkOf=Object.fromEntries(BK_.map(b=>[b.date,b]));att={};
+  (s.attendance||[]).forEach(x=>{att[String(x.start_local).slice(0,10)]=x.status=='was'});
   if(!keepPlan&&PROFILE.plan&&Object.keys(PROFILE.plan).length)plan=PROFILE.plan}
 const MOTTOS={
  z:['Пустой зал не качается. Выбери ближайший слот.','Начать можно сегодня. «С понедельника» тоже сработает, но сегодня быстрее.','Первая тренировка серии самая простая. Сложнее всего дойти до двери.','Штанга никуда не убежит, она ждёт тебя.','Достаточно одной тренировки, чтобы серия пошла.'],
@@ -553,7 +556,7 @@ function openDay(k){const b=bkOf[k],d=pk(k),pl=plan[wdOf(d)],s=stOf(b);
   ${pl&&pl.items.length?mapPair(m=>levelDay(pl,m)):''}`,
    mount:el=>{el.querySelectorAll('[data-ex]').forEach(r=>r.onclick=()=>openEx(r.dataset.ex));
      const c=el.querySelector('#cx');if(c)c.onclick=()=>confirmCancel(b)}})}
-function mark(k,v){att[k]=v;saveAtt();if(LIVE){const b=bkOf[k];api({action:'mark',lid:b.lid,sid:b.sid,status:v?'was':'missed'}).catch(()=>toast('Не удалось сохранить отметку'))}stack.pop();toast(v?'Серия растёт 🔥':'Серия сброшена');draw();rCal();openDay(k)}
+function mark(k,v){att[k]=v;saveAtt();if(LIVE){const b=bkOf[k];api({action:'mark',lid:b.lid,sid:b.sid,date:k,status:v?'was':'missed'}).catch(()=>toast('Не удалось сохранить отметку'))}stack.pop();toast(v?'Серия растёт 🔥':'Серия сброшена');draw();rCal();openDay(k)}
 window.mark=mark;window.openDay=openDay;window.closeAll=closeAll;window.back=back;
 const levelDay=(pl,m)=>{let L=0;for(const it of pl.items){const e=EM[it.id];L=Math.max(L,level(e,m))}return L};
 function exRow(it,i){const e=EM[it.id];return `<button class="lr" data-ex="${e.id}"><div class="lr-main"><div class="lr-t">${e.n}</div><div class="lr-s">${e.p.map(m=>M[m]).join(', ')} · ${e.eq}</div></div><div class="lr-v">${it.s} × ${it.r}${e.u?' '+e.u:''}${it.w?`<small>${it.w} кг</small>`:''}</div></button>`}
